@@ -21,7 +21,7 @@ parser.add_argument(
     '-i',
     '--image_size',
     type=int,
-    default=32,
+    default=40,
     help='Height and width of the image')
 parser.add_argument(
     '-s', '--seed', type=int, default=2702, help='Seed for random generation')
@@ -42,7 +42,7 @@ args = parser.parse_args()
 g = tf.Graph()
 with g.as_default():
     print('Creating model')
-    input_channels = 4  # 3 channels for RGB and 1 channel of all ones 
+    input_channels = 3  # 3 channels for RGB and 1 channel of all ones
     image_size = (args.batch_size, args.image_size, args.image_size,
                   input_channels)
 
@@ -73,7 +73,7 @@ with g.as_default():
     saver = tf.train.Saver(vars_to_restore)
 
     output_images = np.zeros(
-        (args.batch_size, args.image_size, args.image_size, 3))
+        (args.batch_size, args.image_size, args.image_size, 2))
 
     sess = tf.Session()
     sess.run(initialize_cache)
@@ -124,12 +124,15 @@ with g.as_default():
         print('Time taken to generate %d images: %.2f seconds' %
               (args.batch_size, end_time - start_time))
 
-        plt.close('all')
-        image_tile = plotting.img_tile(
-            output_images, border_color=1.0, stretch=True)
-        plotting.plot_img(image_tile)
-        plt.savefig(os.path.join(args.save_dir, 'images_%d.png' % batch))
+        print(type(output_images), output_images.shape)
+        np.savez(os.path.join(args.save_dir, 'fast_%s_sample%d.npz' % ("hawc2", batch)), output_images)
+
+        # plt.close('all')
+        # image_tile = plotting.img_tile(
+        #     output_images, border_color=1.0, stretch=True)
+        # plotting.plot_img(image_tile)
+        # plt.savefig(os.path.join(args.save_dir, 'images_%d.png' % batch))
 
         batch += 1
 
-plt.show()
+# plt.show()

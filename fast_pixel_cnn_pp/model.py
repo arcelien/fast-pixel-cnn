@@ -333,7 +333,7 @@ def model_spec(row_input,
             assert len(u_list) == 0
             assert len(ul_list) == 0
 
-            x_out = nn.nin(tf.nn.elu(ul), 10 * nr_logistic_mix)
+            x_out = nn.nin(tf.nn.elu(ul), (1 + 2*3) * nr_logistic_mix)
             sample = nn.sample_from_discretized_mix_logistic(
                 x_out, nr_logistic_mix, seed=seed)
             cache_v_stack = tf.group(*tf.get_collection(UPDATE_V_STACK))

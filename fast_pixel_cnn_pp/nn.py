@@ -6,6 +6,18 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.contrib.framework.python.ops import add_arg_scope
 
+def num_mult(x):
+    channels = list(map(int, x.get_shape()))[3]
+    if channels == 1:
+        return 1 + 1*2, 2, 1
+    elif channels == 2:
+        return 1 + 2*3, 3, 2
+    elif channels == 3:
+        return 1 + 3*3, 3, 3
+    else:
+        assert False
+        return 1 + 3*channels, 3
+
 def int_shape(x):
     return list(map(int, x.get_shape()))
 
@@ -30,20 +42,28 @@ def log_prob_from_logits(x):
     m = tf.reduce_max(x, axis, keep_dims=True)
     return x - m - tf.log(tf.reduce_sum(tf.exp(x-m), axis, keep_dims=True))
 
+
+dim_mult_1, dim_mult_2, channels = 1 + 2*3, 3, 2
 def discretized_mix_logistic_loss(x,l,sum_all=True):
     """ log-likelihood for mixture of discretized logistics, assumes the data has been rescaled to [-1,1] interval """
     xs = int_shape(x) # true image (i.e. labels) to regress to, e.g. (B,32,32,3)
     ls = int_shape(l) # predicted distribution, e.g. (B,32,32,100)
-    nr_mix = int(ls[-1] / 10) # here and below: unpacking the params of the mixture of logistics
+    nr_mix = int(ls[-1] / dim_mult_1) # here and below: unpacking the params of the mixture of logistics
+    print('l shape', ls, 'mix', nr_mix)
+
     logit_probs = l[:,:,:,:nr_mix]
-    l = tf.reshape(l[:,:,:,nr_mix:], xs + [nr_mix*3])
+    l = tf.reshape(l[:,:,:,nr_mix:], xs + [nr_mix*dim_mult_2])
     means = l[:,:,:,:,:nr_mix]
     log_scales = tf.maximum(l[:,:,:,:,nr_mix:2*nr_mix], -7.)
     coeffs = tf.nn.tanh(l[:,:,:,:,2*nr_mix:3*nr_mix])
     x = tf.reshape(x, xs + [1]) + tf.zeros(xs + [nr_mix]) # here and below: getting the means and adjusting them based on preceding sub-pixels
     m2 = tf.reshape(means[:,:,:,1,:] + coeffs[:, :, :, 0, :] * x[:, :, :, 0, :], [xs[0],xs[1],xs[2],1,nr_mix])
-    m3 = tf.reshape(means[:, :, :, 2, :] + coeffs[:, :, :, 1, :] * x[:, :, :, 0, :] + coeffs[:, :, :, 2, :] * x[:, :, :, 1, :], [xs[0],xs[1],xs[2],1,nr_mix])
-    means = tf.concat(3,[tf.reshape(means[:,:,:,0,:], [xs[0],xs[1],xs[2],1,nr_mix]), m2, m3])
+
+
+    # m3 = tf.reshape(means[:, :, :, 2, :] + coeffs[:, :, :, 1, :] * x[:, :, :, 0, :] + coeffs[:, :, :, 2, :] * x[:, :, :, 1, :], [xs[0],xs[1],xs[2],1,nr_mix])
+    means = tf.concat([tf.reshape(means[:,:,:,0,:], [xs[0],xs[1],xs[2],1,nr_mix]), m2], 3)
+
+
     centered_x = x - means
     inv_stdv = tf.exp(-log_scales)
     plus_in = inv_stdv * (centered_x + 1./255.)
@@ -75,10 +95,12 @@ def discretized_mix_logistic_loss(x,l,sum_all=True):
 
 def sample_from_discretized_mix_logistic(l,nr_mix,seed=None):
     ls = int_shape(l)
-    xs = ls[:-1] + [3]
+    xs = ls[:-1] + [channels]
     # unpack parameters
     logit_probs = l[:, :, :, :nr_mix]
-    l = tf.reshape(l[:, :, :, nr_mix:], xs + [nr_mix*3])
+
+    print('l shape', ls, 'mix', nr_mix)
+    l = tf.reshape(l[:, :, :, nr_mix:], xs + [nr_mix*dim_mult_2])
     # sample mixture indicator from softmax
     sel = tf.one_hot(tf.argmax(logit_probs - tf.log(-tf.log(tf.random_uniform(logit_probs.get_shape(), minval=1e-5, maxval=1. - 1e-5, seed=seed))), 3), depth=nr_mix, dtype=tf.float32)    
     sel = tf.reshape(sel, xs[:-1] + [1,nr_mix])
@@ -94,8 +116,8 @@ def sample_from_discretized_mix_logistic(l,nr_mix,seed=None):
     x = means + tf.exp(log_scales)*(tf.log(u) - tf.log(1. - u))
     x0 = tf.minimum(tf.maximum(x[:,:,:,0], -1.), 1.)
     x1 = tf.minimum(tf.maximum(x[:,:,:,1] + coeffs[:,:,:,0]*x0, -1.), 1.)
-    x2 = tf.minimum(tf.maximum(x[:,:,:,2] + coeffs[:,:,:,1]*x0 + coeffs[:,:,:,2]*x1, -1.), 1.)
-    return tf.concat([tf.reshape(x0,xs[:-1]+[1]), tf.reshape(x1,xs[:-1]+[1]), tf.reshape(x2,xs[:-1]+[1])], 3)
+    # x2 = tf.minimum(tf.maximum(x[:,:,:,2] + coeffs[:,:,:,1]*x0 + coeffs[:,:,:,2]*x1, -1.), 1.)
+    return tf.concat([tf.reshape(x0,xs[:-1]+[1]), tf.reshape(x1,xs[:-1]+[1])], 3)
 
 def get_var_maybe_avg(var_name, ema, **kwargs):
     ''' utility for retrieving polyak averaged params '''

@@ -1,10 +1,10 @@
 import fast_pixel_cnn_pp.model as model
 import fast_pixel_cnn_pp.fast_nn as fast_nn
-import fast_pixel_cnn_pp.plotting as plotting
+# import fast_pixel_cnn_pp.plotting as plotting
 
 import tensorflow as tf
 import numpy as np
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
 import argparse
 import time
